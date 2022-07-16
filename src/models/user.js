@@ -35,10 +35,8 @@ const userSchema = new mongoose.Schema({
     },
     role: {
         type: String,
-        default: `user`,
-        validate(value) {
-            if ([`user`, `admin`].indexOf(value) < 0) throw new Error('invalid role')
-        }
+        default: 'buyer',
+        enum: ['buyer', 'seller', 'admin', 'owner']
     },
     tokens: [{
         token: {

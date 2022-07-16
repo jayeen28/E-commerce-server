@@ -14,7 +14,7 @@ router.post('/users', async (req, res) => {
         const allowedInfo = ['name', 'email', 'password'];
         const isValid = Object.keys(req.body).every(key => allowedInfo.includes(key));
         if (!isValid) return res.status(400).send('Invalid request');
-        req.body.role = 'user'
+        req.body.role = 'buyer'
         req.body.active = true;
         const user = await new User(req.body);
         let status = await sendMail({
@@ -120,9 +120,10 @@ router.get('/users/:id', auth, async (req, res) => {
 router.patch('/users/me', auth, async (req, res) => {
     try {
         const updates = Object.keys(req.body)
-        const allowedUpdates = ['name', 'email', 'password', 'dob', 'avatar', 'designation']
-        const isValidOperation = updates.every((update) => allowedUpdates.includes(update))
-        if (!isValidOperation) return res.status(400).send({ error: 'Invalid updates!' })
+        const allowedUpdates = ['name', 'email', 'password', 'dob', 'avatar', 'designation', 'role']
+        let isValidOperation = updates.every((update) => allowedUpdates.includes(update))
+        if (updates.includes('role') && !['buyer', 'seller'].includes(req.body.role)) isValidOperation = false;
+        if (!isValidOperation) return res.status(400).send('Invalid updates!')
         updates.forEach((update) => req.user[update] = req.body[update])
         await req.user.save()
         res.status(200).send(req.user)
@@ -139,8 +140,9 @@ router.patch('/users/:id', auth, async (req, res) => {
         const targetUser = await User.findOne({ _id: req.params.id })
         const updates = Object.keys(req.body)
         const allowedUpdates = ['name', 'email', 'password', 'dob', 'role', 'active']
-        const isValidOperation = updates.every((update) => allowedUpdates.includes(update))
-        if (!isValidOperation) return res.status(400).send({ error: 'Invalid updates!' })
+        let isValidOperation = updates.every((update) => allowedUpdates.includes(update))
+        if (updates.includes('role') && !['buyer', 'seller'].includes(req.body.role)) isValidOperation = false;
+        if (!isValidOperation) return res.status(400).send('Invalid updates!')
         updates.forEach((update) => targetUser[update] = req.body[update])
         await targetUser.save()
         res.status(200).send(targetUser)
