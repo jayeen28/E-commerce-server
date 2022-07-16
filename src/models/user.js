@@ -27,9 +27,7 @@ const userSchema = new mongoose.Schema({
         minlength: 7,
         trim: true,
         validate(value) {
-            if (value.toLowerCase().includes('password')) {
-                throw new Error('Password cannot contain "password"')
-            }
+            if (value.toLowerCase().includes('password')) throw new Error('Password cannot contain "password"')
         }
     },
     dob: {
@@ -39,9 +37,7 @@ const userSchema = new mongoose.Schema({
         type: String,
         default: `user`,
         validate(value) {
-            if ([`user`, `admin`].indexOf(value) < 0) {
-                throw new Error('invalid role')
-            }
+            if ([`user`, `admin`].indexOf(value) < 0) throw new Error('invalid role')
         }
     },
     tokens: [{
@@ -63,8 +59,7 @@ const userSchema = new mongoose.Schema({
     }
 )
 userSchema.methods.toJSON = function () {
-    const user = this
-    const userObject = user.toObject()
+    const userObject = this.toObject()
     delete userObject.password
     delete userObject.tokens
     delete userObject.avatar
@@ -72,45 +67,26 @@ userSchema.methods.toJSON = function () {
 }
 
 userSchema.methods.generateAuthToken = async function () {
-    const user = this
-    if (this.active == false) {
-        throw new Error("Please get your account activated.")
-
-    } else {
-        const token = jwt.sign({ _id: user._id.toString() }, process.env.JWT_SECRET)
-
-        user.tokens = user.tokens.concat({ token })
-        await user.save()
-        return token
-    }
+    if (!this.active) throw new Error("Please get your account activated.")
+    const token = jwt.sign({ _id: this._id.toString() }, process.env.JWT_SECRET)
+    this.tokens = this.tokens.concat({ token })
+    await this.save()
+    return token
 }
 
 userSchema.statics.findByCredentials = async (email, password) => {
     const user = await User.findOne({ email })
-
-    if (!user) {
-        throw new Error('Unable to login')
-    }
-
+    if (!user) throw new Error('Unable to login')
     const isMatch = await bcrypt.compare(password, user.password)
-
-    if (!isMatch) {
-        throw new Error('Unable to login')
-    }
-
+    if (!isMatch) throw new Error('Unable to login')
     return user
 }
 
 // Hash the plain text password before saving
 userSchema.pre('save', async function (next) {
-    const user = this
-
-    if (user.isModified('password')) {
-        user.password = await bcrypt.hash(user.password, 8)
-    }
+    if (this.isModified('password')) this.password = await bcrypt.hash(this.password, 8)
     next()
 })
 
 const User = mongoose.model('User', userSchema)
-
 module.exports = User
