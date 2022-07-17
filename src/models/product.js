@@ -4,15 +4,11 @@ const productSchema = new Schema({
     name: {
         type: String,
         required: true,
+        unique: true,
         trim: true
     },
     price: {
         type: Number,
-        required: true,
-        trim: true
-    },
-    tokenType: {
-        type: String,
         required: true,
         trim: true
     },
@@ -21,14 +17,13 @@ const productSchema = new Schema({
         required: true,
         trim: true
     },
-    image: {
-        type: String,
-        required: false,//should be true later
-        trim: true
+    images: {
+        type: Object,
+        required: true
     },
     category: {
         type: String,
-        required: false,//should be true later
+        required: true,
         trim: true
     },
     quantity: {
@@ -36,7 +31,7 @@ const productSchema = new Schema({
         required: true,
         trim: true
     }
-}, { timestamps: true });
+}, { timestamps: true }, { versionKey: false });
 
 const Product = model('Product', productSchema);
 module.exports = Product;

@@ -1,23 +1,21 @@
 const { Router } = require('express');
 const router = new Router();
 const auth = require('../middleware/auth');
+const VRole = require('../middleware/VRole');
 const Product = require('../models/product');
 
 /**
  * Create product
  */
-router.post('/products', auth, async (req, res) => {
+router.post('/products', auth, VRole(['admin', 'owner', 'seller', 'buyer']), async (req, res) => {
     try {
-        if (req.user.role !== 'admin') return res.status(401).send();
         const product = new Product({
             ...req.body,
             owner: req.user._id
         });
         await product.save();
         res.status(201).send(product);
-    } catch (e) {
-        res.status(400).send(e);
-    }
+    } catch (e) { res.status(500).send('Failed to create product.') }
 })
 
 /**
@@ -40,10 +38,8 @@ router.get('/products', async (req, res) => {
             skip: pageOptions.page * pageOptions.limit,
             sort
         }).exec();
-        res.send(products);
-    } catch (e) {
-        res.status(500).send(e);
-    }
+        res.status(200).send(products);
+    } catch (e) { res.status(500).send('Failed to get all products.'); }
 });
 
 /**
@@ -52,13 +48,9 @@ router.get('/products', async (req, res) => {
 router.get('/products/:id', async (req, res) => {
     try {
         const product = await Product.findById(req.params.id);
-        if (!product) {
-            return res.status(404).send();
-        }
-        res.send(product);
-    } catch (e) {
-        res.status(500).send(e);
-    }
+        if (!product) return res.status(404).send('Product not found.');
+        res.status(200).send(product);
+    } catch (e) { res.status(500).send('Something went wrong.') }
 })
 
 /**
