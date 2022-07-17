@@ -74,11 +74,11 @@ router.patch('/products/:id', auth, VRole(['admin', 'owner', 'seller']), async (
 /**
  * Delete product by id
  */
-router.delete('/products/:id', auth, async (req, res) => {
+router.delete('/products/:id', auth, VRole(['owner', 'admin', 'seller']), async (req, res) => {
     try {
-        if (req.user.role !== 'admin') return res.status(401).send();
         const product = await Product.findById(req.params.id);
-        if (!product) return res.status(404).send();
+        if (!product) return res.status(404).send('Product not found.');
+        if (product.owner.toString() !== req.user.id) return res.status(404).send('You are not the creator of this product.')
         await product.remove();
         res.send(product);
     } catch (e) {
