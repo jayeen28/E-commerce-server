@@ -7,7 +7,7 @@ const Product = require('../models/product');
 /**
  * Create product
  */
-router.post('/products', auth, VRole(['admin', 'owner', 'seller', 'buyer']), async (req, res) => {
+router.post('/products', auth, VRole(['admin', 'owner', 'seller']), async (req, res) => {
     try {
         const product = new Product({
             ...req.body,
@@ -56,21 +56,19 @@ router.get('/products/:id', async (req, res) => {
 /**
  * Update product by id
  */
-router.patch('/products/:id', auth, async (req, res) => {
+router.patch('/products/:id', auth, VRole(['admin', 'owner', 'seller']), async (req, res) => {
     try {
-        if (req.user.role !== 'admin') return res.status(401).send();
         const updates = Object.keys(req.body);
-        const allowedUpdates = ['name', 'price', 'description', 'imageUrl', 'quantity'];
+        const allowedUpdates = ['name', 'price', 'description', 'images', 'quantity', 'category'];
         const isValidOperation = updates.every((update) => allowedUpdates.includes(update));
         if (!isValidOperation) return res.status(400).send({ error: 'Invalid updates!' });
         const product = await Product.findById(req.params.id);
-        if (!product) return res.status(404).send();
+        if (!product) return res.status(404).send('Product not found.');
+        if (product.owner.toString() !== req.user.id) return res.status(404).send('You are not the creator of this product.')
         updates.forEach((update) => product[update] = req.body[update]);
         await product.save();
-        res.send(product);
-    } catch (e) {
-        res.status(400).send(e);
-    }
+        res.status(200).send(product);
+    } catch (e) { res.status(400).send('Failed to update product.') }
 })
 
 /**
