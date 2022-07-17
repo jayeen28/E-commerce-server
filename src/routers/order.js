@@ -1,109 +1,68 @@
 const { Router } = require('express');
 const router = new Router();
+const auth = require('../middleware/auth');
+const VRole = require('../middleware/VRole');
 const Order = require('../models/order');
 const Product = require('../models/product');
-const auth = require('../middleware/auth');
 
 /**
- * @api {post} /order Create an order
+ * @route POST /orders This endpoint is for creating orders.
+ * @access Public
  */
-router.post('/order', auth, async (req, res) => {
+router.post('/order', auth, VRole(['owner', 'admin', 'buyer']), async (req, res) => {
     try {
-        const { productId, quantity, address, phone } = req.body;
-        const product = await Product.findById(productId);
-        if (!product) return res.status(400).send('Product not found.');
-        if (product.quantity < quantity) return res.status(400).send('Quentity not available.');
-        product.quantity -= quantity;
-        await product.save();
-        const order = new Order({ user: req.user.id, productId, quantity, address, phone });
-        order.totalPrice = product.quantity * product.price;
+        // GET THE PRODUCTS
+        const productIds = req.body.products.map((product) => product.id);
+        const products = await Product.find({ _id: { $in: productIds } }, [
+            "name",
+            "price",
+            "quantity",
+        ]);
+        if (products.length !== productIds.length) return res.status(400).send("Maybe there is one or more invalid product ID's.");
+
+        // QUANTITY CHECK 
+        const isValQuantity = products.map((product) => {
+            const orderedProduct = req.body.products.find((p) => p.id === product._id.toString());
+            return orderedProduct.quantity < 1 || orderedProduct.quantity > product.quantity ?
+                { product, valid: false, quantity: orderedProduct.quantity } :
+                { product, valid: true, quantity: orderedProduct.quantity }
+        });
+        const finalProducts = isValQuantity.filter((product) => product.valid === true);
+        if (finalProducts.length === 0) return res.status(400).send("Invalid quantity of every products.");
+
+        // UPDATE THE PRODUCTS QUANTITY
+        await Promise.all(finalProducts.map(
+            async ({ product, quantity }) =>
+                await Product.findByIdAndUpdate(product.id, {
+                    $inc: { quantity: -quantity },
+                })
+        ));
+
+        // CALCULATE TOTAL PRICE
+        const totalPrice = finalProducts.reduce((total, { product, quantity }) => total + (product.price * quantity), 0);
+
+        // CREATE ORDER 
+        const order = new Order({
+            user: req.user._id,
+            products: finalProducts.map(({ product, quantity }) => ({
+                id: product._id,
+                quantity,
+            })),
+            totalPrice,
+        });
         await order.save();
-        res.status(201).send(order);
-    } catch (e) { res.status(500).send('Something went wrong while creating order'); }
-});
 
-/**
- * @api {get} /order Get all orders
- */
-router.get('/order', auth, async (req, res) => {
-    try {
-        if (req.user.role !== 'admin') return res.status(401).send('You are not authorized to see orders.');
-        const orders = await Order.find({}).populate('products.product', 'name price');
-        res.status(200).send(orders);
-    } catch (e) {
-        res.status(400).send('Something went wrong while getting orders');
-    }
-});
+        // PREPARE A MESSAGE IF INVALID PRODUCT QUANTITIES FOUND
+        const invalidProducts = isValQuantity.filter((product) => product.valid === false); //get the invalid products and create message if found invalid products for the requester
+        let message;
+        if (invalidProducts.length > 0)
+            message = `The following products are not available: ${invalidProducts
+                .map(({ product }, index) => `${index + 1}. ${product.name}`)
+                .join(", ")}`;
 
-/**
- * @api {get} /order/:id Get an order
- */
-router.get('/order/:id', auth, async (req, res) => {
-    try {
-        const order = await Order.findById(req.params.id).populate('products.product', 'name price');
-        if (!order) return res.status(404).send('Order not found');
-        if (req.user.id === order.user || req.user.role === 'admin') res.status(200).send(order);
-        else res.status(401).send('Sorry, you are not authorized to see this order.');
-    } catch (e) {
-        console.log(e)
-        res.status(400).send('Something went wrong while getting order');
-    }
-});
-
-/**
- * @api {put} /order/:id Update an order
- */
-// It will be uncommented if needed. NOTE: Here is no validation for the update.
-// router.put('/order/:id', async (req, res) => {
-//     try {
-//         const order = await Order.findByIdAndUpdate(req.params.id, req.body, { new: true });
-//         res.status(200).send(order);
-//     } catch (e) {
-//         res.status(400).send('Something went wrong while updating order');
-//     }
-// });
-
-/**
- * @api {delete} /order/:id Delete an order
- */
-router.delete('/order/:id', auth, async (req, res) => {
-    try {
-        const order = await Order.findById(req.params.id);
-        if (!order) return res.status(400).send('Order not found');
-        if (req.user.role === 'admin' || order.user === req.user.id) {
-            const deleteRes = await Order.deleteOne(order);
-            res.status(200).send({ ...deleteRes, id: order._id });
-        }
-        else res.status(401).send('You are not authorized to delete orders.');
-    } catch (e) {
-        res.status(400).send('Something went wrong while deleting order');
-    }
-});
-
-/**
- * @api {get} /order/:userId Get orders of a user
- */
-router.get('/order/user/me', auth, async (req, res) => {
-    try {
-        // if (req.user.id !== req.params.id) return res.status(400).send('You are not the creator of this order.');
-        const orders = await Order.find({ user: req.user.id });
-        res.status(200).send(orders);
-    } catch (e) {
-        res.status(400).send('Something went wrong while getting orders of user');
-    }
-});
-
-/**
- * @api {get} /order/user/:id Get orders of a user 
- */
-router.get('/order/user/:id', auth, async (req, res) => {
-    try {
-        if (req.user.role !== 'admin') return res.status(401).send('You are not authorized to see orders.');
-        const orders = await Order.find({ user: req.params.id });
-        res.status(200).send(orders);
-    } catch (e) {
-        res.status(400).send('Something went wrong while getting orders of user');
-    }
+        // SEND RESPONSE
+        res.status(200).send({ order, message });
+    } catch (e) { res.status(500).send('Fail to create the order.') }
 });
 
 module.exports = router;
