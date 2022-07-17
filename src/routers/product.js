@@ -3,11 +3,12 @@ const router = new Router();
 const auth = require('../middleware/auth');
 const VRole = require('../middleware/VRole');
 const Product = require('../models/product');
+const PManagers = ['admin', 'owner', 'seller'];
 
 /**
  * Create product
  */
-router.post('/products', auth, VRole(['admin', 'owner', 'seller']), async (req, res) => {
+router.post('/products', auth, VRole(PManagers), async (req, res) => {
     try {
         const product = new Product({
             ...req.body,
@@ -56,15 +57,15 @@ router.get('/products/:id', async (req, res) => {
 /**
  * Update product by id
  */
-router.patch('/products/:id', auth, VRole(['admin', 'owner', 'seller']), async (req, res) => {
+router.patch('/products/:id', auth, VRole(PManagers), async (req, res) => {
     try {
+        const product = await Product.findById(req.params.id);
+        if (!product) return res.status(404).send('Product not found.');
+        if (product.owner.toString() !== req.user.id) return res.status(400).send('You are not the creator of this product.')
         const updates = Object.keys(req.body);
         const allowedUpdates = ['name', 'price', 'description', 'images', 'quantity', 'category'];
         const isValidOperation = updates.every((update) => allowedUpdates.includes(update));
         if (!isValidOperation) return res.status(400).send({ error: 'Invalid updates!' });
-        const product = await Product.findById(req.params.id);
-        if (!product) return res.status(404).send('Product not found.');
-        if (product.owner.toString() !== req.user.id) return res.status(404).send('You are not the creator of this product.')
         updates.forEach((update) => product[update] = req.body[update]);
         await product.save();
         res.status(200).send(product);
@@ -74,16 +75,14 @@ router.patch('/products/:id', auth, VRole(['admin', 'owner', 'seller']), async (
 /**
  * Delete product by id
  */
-router.delete('/products/:id', auth, VRole(['owner', 'admin', 'seller']), async (req, res) => {
+router.delete('/products/:id', auth, VRole(PManagers), async (req, res) => {
     try {
         const product = await Product.findById(req.params.id);
         if (!product) return res.status(404).send('Product not found.');
         if (product.owner.toString() !== req.user.id) return res.status(404).send('You are not the creator of this product.')
         await product.remove();
-        res.send(product);
-    } catch (e) {
-        res.status(500).send(e);
-    }
+        res.status(200).send(product);
+    } catch (e) { res.status(500).send('Failed to delete the product.') }
 })
 
 module.exports = router;
