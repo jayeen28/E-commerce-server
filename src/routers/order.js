@@ -65,4 +65,69 @@ router.post('/order', auth, VRole(['owner', 'admin', 'buyer']), async (req, res)
     } catch (e) { res.status(500).send('Fail to create the order.') }
 });
 
+
+/**
+ * @route GET /orders This endpoint is for getting all orders.
+ * @access Private
+ * NOTE: Admins can query only with _id, status and user.
+ */
+router.get('/orders', auth, VRole(['owner', 'admin', 'seller']), async (req, res) => {
+    try {
+        // PREPARE SEARCH PARAMS
+        let searchParams = {}
+        Object.keys(req.query).forEach(key => {
+            if (!['_id', 'status', 'user'].includes(key)) return res.status(400).send('Invalid query');
+            searchParams[key] = req.query[key];
+        });
+
+        // GET THE ORDERS
+        let orders = await Order.find(searchParams).populate('products.id')
+
+        // SEND ALL ORDERS IF THER REQUESTER IS OWNER OR ADMIN
+        if (['owner', 'admin'].includes(req.user.role)) return res.status(200).send(orders);
+
+        // IF THE REQUESTER IS SELLER THEN SEND ONLY HIS ORDERS.
+        if (req.user.role !== 'seller') return res.status(400).send('You are unauthorized to get the orders.')
+        orders = orders.filter(order => {
+            order.products = order.products.filter(product => req.user.id === product.id.productOwner.toString())
+            return order.products.length > 0;
+        })
+        res.status(200).send(orders)
+    } catch (e) { res.status(500).send('Failed to get the orders.'); }
+});
+
+/**
+ * @route GET /orders/me get own orders
+ * @access Private
+ */
+router.get('/orders/me', auth, async (req, res) => {
+    try {
+        const orders = await Order.find({ user: req.user._id });
+        res.status(200).send(orders);
+    } catch (e) { res.status(500).send('Failed to get the orders.') }
+});
+
+/**
+ * @route GET /orders/:id This endpoint is for getting an order by id.
+ * @access Private
+ */
+router.get('/orders/:id', auth, async (req, res) => {
+    try {
+        // FIND THE ORDER
+        const order = await Order.findById(req.params.id).populate('products.id')
+        if (!order) return res.status(404).send('Order not found');
+
+        // IF THE REQUESTER IS FROM THE ADMIN SIDE OR THE CREATOR OF THE ORDER THEN SEND THE ORDER.
+        const isAdmin = ['owner', 'admin'].includes(req.user.role);
+        const isOrderCreator = order.user.toString() === req.user.id;
+        if (isAdmin || isOrderCreator) return res.status(200).send(order);
+
+        // IF THE REQUESTER IS SELLER THEN SEND ONLY HIS ORDERS.
+        if (req.user.role !== 'seller') return res.status(400).send('You are unauthorized to get the order.')
+        order.products = order.products.filter(product => req.user.id === product.id.productOwner.toString());
+        if (order.products.length === 0) return res.status(401).send('You are unauthorized to get the order.');
+        res.status(200).send(order);
+    } catch (e) { res.status(500).send('Failed to get the order') }
+});
+
 module.exports = router;
