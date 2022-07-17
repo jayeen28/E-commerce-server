@@ -130,4 +130,19 @@ router.get('/orders/:id', auth, async (req, res) => {
     } catch (e) { res.status(500).send('Failed to get the order') }
 });
 
+/**
+ * @route PATCH /orders/status/:id This endpoint is for updating order status.
+ * @access Private
+ */
+router.patch('/orders/status/:id', auth, VRole(['owner', 'admin', 'seller']), async (req, res) => {
+    try {
+        const order = await Order.findById(req.params.id);
+        if (!order) return res.status(404).send('Order not found');
+        if (order.status === 'completed') return res.status(400).send('Order already completed');
+        order.status = req.body.status;
+        await order.save();
+        res.status(200).send(order);
+    } catch (e) { res.status(500).send('Failed to update the order status.') }
+});
+
 module.exports = router;
