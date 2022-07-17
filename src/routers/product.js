@@ -21,11 +21,13 @@ router.post('/products', auth, VRole(PManagers), async (req, res) => {
 
 /**
  * Get all products
- * EXAMPLE: GET /products?page=1&limit=10&sortBy=name:desc
+ * EXAMPLE: GET /products?search="test"&page=1&limit=10&sortBy=name:desc
  */
 router.get('/products', async (req, res) => {
     try {
-        const sort = {};
+        let params = {}
+        let sort = {};
+        if (req.query.search) params = { ...params, $text: { $search: req.query.search } }
         if (req.query.sortBy) {
             const parts = req.query.sortBy.split(':');
             sort[parts[0]] = parts[1] === 'desc' ? -1 : 1;
@@ -34,7 +36,7 @@ router.get('/products', async (req, res) => {
             page: parseInt(req.query.page, 10) || 0,
             limit: parseInt(req.query.limit, 10) || 10
         }
-        const products = await Product.find({}, null, {
+        const products = await Product.find(params, null, {
             limit: pageOptions.limit,
             skip: pageOptions.page * pageOptions.limit,
             sort
