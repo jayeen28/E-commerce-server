@@ -28,14 +28,11 @@ router.post('/cart/:method', auth, async (req, res) => {
         const product = await Product.findById(req.query.productId);
         if (!product) throw new Error('Product not found');
         const user = req.user
-        if (!user) throw new Error('User not found');
         const item = user.cart.find(cart => cart.productId.toString() === req.query.productId);
         methods[req.params.method](item, user);
         await user.save();
         res.send(user.cart);
-    } catch (e) {
-        res.status(400).send('Something went wrong while managing cart');
-    }
+    } catch (e) { res.status(500).send('Something went wrong while managing cart'); }
 });
 
 module.exports = router;

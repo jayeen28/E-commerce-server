@@ -38,6 +38,10 @@ const userSchema = new mongoose.Schema({
         default: 'buyer',
         enum: ['buyer', 'seller', 'admin', 'owner']
     },
+    cart: {
+        type: Array,
+        default: []
+    },
     tokens: [{
         token: {
             type: String,
