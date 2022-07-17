@@ -30,6 +30,12 @@ const productSchema = new Schema({
         type: Number,
         required: true,
         trim: true
+    },
+    owner: {
+        type: Schema.Types.ObjectId,
+        ref: 'User',
+        required: true,
+        trim: true
     }
 }, { timestamps: true }, { versionKey: false });
 
