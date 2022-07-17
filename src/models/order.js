@@ -23,8 +23,13 @@ const orderSchema = new Schema({
         type: String,
         trim: true,
         required: true
+    },
+    totalPrice: {
+        type: Number,
+        required: true,
+        trim: true
     }
-}, { timestamps: true });
+}, { timestamps: true }, { versionKey: false });
 
 const Order = model('Order', orderSchema);
 module.exports = Order;

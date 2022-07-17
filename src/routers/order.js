@@ -10,25 +10,16 @@ const auth = require('../middleware/auth');
 router.post('/order', auth, async (req, res) => {
     try {
         const { productId, quantity, address, phone } = req.body;
-        const order = new Order({
-            user: req.user.id,
-            productId,
-            quantity,
-            address,
-            phone
-        });
-
         const product = await Product.findById(productId);
-        if (!product) return res.status(400).send('Invalid product id');
+        if (!product) return res.status(400).send('Product not found.');
         if (product.quantity < quantity) return res.status(400).send('Quentity not available.');
         product.quantity -= quantity;
         await product.save();
+        const order = new Order({ user: req.user.id, productId, quantity, address, phone });
+        order.totalPrice = product.quantity * product.price;
         await order.save();
-        res.status(200).send(order);
-    } catch (e) {
-        console.log(e)
-        res.status(400).send('Something went wrong while creating order');
-    }
+        res.status(201).send(order);
+    } catch (e) { res.status(500).send('Something went wrong while creating order'); }
 });
 
 /**
