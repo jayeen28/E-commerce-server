@@ -1,22 +1,16 @@
+const fs = require('fs')
 require('dotenv').config()
 const express = require('express')
 require('./db/mongoose')
-const userRouter = require('./routers/user');
-const productRouter = require('./routers/product');
-const cartRouter = require('./routers/cart');
-const orderRouter = require('./routers/order');
 var cors = require('cors')
-
 const app = express()
 const port = process.env.PORT;
-
 app.use(cors())
 app.use(express.json())
-app.use(userRouter);
-app.use(productRouter);
-app.use(cartRouter);
-app.use(orderRouter);
-
-app.listen(port, () => {
-    console.log('Server is up on port ' + port)
-})
+/**
+ * NOTE: If routes are not working and keep loading for long
+ * then please check if all the items are router function in the routers array.
+ */
+const v1Routers = fs.readdirSync('src/routers').map(file => require(`./routers/${file}`))
+app.use('/api/v1/', v1Routers);
+app.listen(port, () => console.log('Server is up on port ' + port))
