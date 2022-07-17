@@ -1,6 +1,4 @@
 const express = require('express')
-const multer = require('multer')
-const sharp = require('sharp')
 const User = require('../models/user')
 const auth = require('../middleware/auth')
 const router = new express.Router()
@@ -120,7 +118,7 @@ router.get('/users/:id', auth, async (req, res) => {
 router.patch('/users/me', auth, async (req, res) => {
     try {
         const updates = Object.keys(req.body)
-        const allowedUpdates = ['name', 'email', 'password', 'dob', 'avatar', 'designation', 'role']
+        const allowedUpdates = ['name', 'email', 'password', 'dob', 'avatar', 'designation', 'role', 'avatar']
         let isValidOperation = updates.every((update) => allowedUpdates.includes(update))
         if (updates.includes('role') && !['buyer', 'seller'].includes(req.body.role)) isValidOperation = false;
         if (!isValidOperation) return res.status(400).send('Invalid updates!')
@@ -139,7 +137,7 @@ router.patch('/users/:id', auth, async (req, res) => {
         if (req.user.role !== "admin") return res.status(400).send(`You don't have permission to access this page`)
         const targetUser = await User.findOne({ _id: req.params.id })
         const updates = Object.keys(req.body)
-        const allowedUpdates = ['name', 'email', 'password', 'dob', 'role', 'active']
+        const allowedUpdates = ['name', 'email', 'password', 'dob', 'role', 'active', 'avatar']
         let isValidOperation = updates.every((update) => allowedUpdates.includes(update))
         if (updates.includes('role') && !['buyer', 'seller'].includes(req.body.role)) isValidOperation = false;
         if (!isValidOperation) return res.status(400).send('Invalid updates!')
@@ -174,49 +172,6 @@ router.post('/user/:id/:action', auth, async (req, res) => {
         action[req.params.action](user, req.body.status)
     }
     catch (e) { res.status(500).send('Failed to do the action.') }
-});
-
-const upload = multer({
-    limits: {
-        fileSize: 1000000
-    },
-    fileFilter(req, file, cb) {
-        if (!file.originalname.match(/\.(jpg|jpeg|png)$/)) return cb(new Error('Please upload an image'))
-        cb(undefined, true)
-    }
-})
-
-router.post('/user/me/avatar', auth, upload.single('avatar'), async (req, res) => {
-    const buffer = await sharp(req.file.buffer).resize({ width: 250, height: 250 }).png().toBuffer()
-    req.user.avatar = buffer
-    await req.user.save()
-    res.status(200).send()
-}, (error, req, res, next) => {
-    res.status(400).send({ error: error.message })
-})
-
-router.delete('/user/me/avatar', auth, async (req, res) => {
-    req.user.avatar = undefined
-    await req.user.save()
-    res.status(200).send()
-})
-
-router.get('/user/:id/avatar', async (req, res) => {
-    try {
-        const user = await User.findById(req.params.id)
-        if (!user || !user.avatar) throw new Error()
-        res.set('Content-Type', 'image/png')
-        res.status(200).send(user.avatar)
-    } catch (e) { res.status(404).send('Failed to get the avatar.') }
-})
-
-router.get('/user/:id/profile', async (req, res) => {
-    try {
-        const user = await User.findById(req.params.id)
-        if (!user) throw new Error()
-        // res.set('Content-Type', 'image/png')
-        res.status(200).send({ name: user.name, avatar: user.avatar })
-    } catch (e) { res.status(404).send('Failed to get user profile.') }
 });
 
 module.exports = router
