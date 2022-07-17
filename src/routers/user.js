@@ -2,7 +2,7 @@ const express = require('express')
 const User = require('../models/user')
 const auth = require('../middleware/auth')
 const router = new express.Router()
-const { sendMail } = require('../emails/mailsender');
+const sendMail = require('../manageEmail/sendEmail');
 
 /**
  * @api {post} /users Create a new user
